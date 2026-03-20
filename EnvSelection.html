@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Path Inspector Pro - API Selector</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="template/theme-button.js" defer></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap');
+        .glass { @apply bg-white/70 dark:bg-slate-800/50 backdrop-blur-xl border border-slate-200 dark:border-white/10; }
+        .disabled-state {
+            @apply opacity-30 pointer-events-none cursor-not-allowed;
+            filter: grayscale(100%);
+        }
+    </style>
+</head>
+
+<body class="min-h-screen flex flex-col items-center p-8 transition-colors duration-300 bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
+
+<div class="fixed top-6 right-6">
+    <theme-button></theme-button>
+</div>
+
+<div class="w-full max-w-5xl space-y-6">
+    <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold tracking-tight mb-2 text-slate-900 dark:text-white">API Inspector</h1>
+        <p class="text-slate-500 dark:text-slate-400">Select environment to unlock API endpoints</p>
+    </div>
+
+    <div class="glass p-6 rounded-2xl shadow-xl">
+        <div class="flex flex-col md:flex-row gap-4 items-end">
+            <div class="flex-grow space-y-2">
+                <label class="text-xs font-semibold uppercase tracking-wider text-slate-400 ml-1">1. Environment</label>
+                <div class="relative">
+                    <i data-lucide="globe" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+                    <select id="envSelector" class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none transition-all">
+                        <option value="">Select Environment...</option>
+                        <option value="prod">Production</option>
+                        <option value="staging">Staging</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="fetchApis()" id="btnFetchApis" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 h-[50px] min-w-[160px]">
+                <span id="fetchLabel">Load APIs</span>
+                <div id="fetchLoader" class="hidden w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+            </button>
+        </div>
+    </div>
+
+    <div id="apiSection" class="glass p-6 rounded-2xl shadow-xl disabled-state transition-all duration-500">
+        <div class="flex flex-col md:flex-row gap-4 items-end">
+            <div class="flex-grow space-y-2">
+                <label class="text-xs font-semibold uppercase tracking-wider text-slate-400 ml-1">2. API Endpoint</label>
+                <div class="relative">
+                    <i data-lucide="server" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+                    <select id="apiSelector" disabled class="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-3 pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none transition-all">
+                        <option value="">Awaiting Environment...</option>
+                    </select>
+                </div>
+            </div>
+            <button id="btnInspect" onclick="inspectApi()" disabled class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 px-8 rounded-xl transition-all flex items-center justify-center gap-2 active:scale-95 h-[50px]">
+                <i data-lucide="search" class="w-4 h-4"></i> Inspect
+            </button>
+        </div>
+    </div>
+
+    <div id="resultsSection" class="space-y-4 disabled-state transition-all duration-500">
+        <div class="glass p-4 rounded-xl border-l-4 border-l-blue-500">
+            <p class="text-xs font-mono text-slate-400 uppercase mb-1">Response Token</p>
+            <p id="responseString" class="font-mono text-blue-600 dark:text-blue-400 break-all font-medium">---</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="glass rounded-xl overflow-hidden flex flex-col">
+                <div class="px-4 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/50 flex justify-between items-center">
+                    <span class="text-xs font-bold uppercase text-slate-500">Request Body</span>
+                    <button onclick="copyContent('jsonLeft', this)" class="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-blue-500">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <pre id="jsonLeft" class="p-4 text-[11px] font-mono text-slate-600 dark:text-slate-300 overflow-auto h-72 leading-relaxed whitespace-pre-wrap">{}</pre>
+            </div>
+
+            <div class="glass rounded-xl overflow-hidden flex flex-col">
+                <div class="px-4 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-100/50 dark:bg-slate-800/50 flex justify-between items-center">
+                    <span class="text-xs font-bold uppercase text-slate-500">Response Payload</span>
+                    <button onclick="copyContent('jsonRight', this)" class="p-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors text-slate-400 hover:text-blue-500">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <pre id="jsonRight" class="p-4 text-[11px] font-mono text-slate-600 dark:text-slate-300 overflow-auto h-72 leading-relaxed whitespace-pre-wrap">{}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    lucide.createIcons();
+
+    // Copy Functionality
+    async function copyContent(elementId, btn) {
+        const text = document.getElementById(elementId).innerText;
+        try {
+            await navigator.clipboard.writeText(text);
+
+            // Visual feedback
+            const icon = btn.querySelector('i');
+            const originalIcon = icon.getAttribute('data-lucide');
+
+            icon.setAttribute('data-lucide', 'check');
+            icon.classList.add('text-emerald-500');
+            lucide.createIcons();
+
+            setTimeout(() => {
+                icon.setAttribute('data-lucide', originalIcon);
+                icon.classList.remove('text-emerald-500');
+                lucide.createIcons();
+            }, 2000);
+        } catch (err) {
+            console.error('Failed to copy: ', err);
+        }
+    }
+
+    function fetchApis() {
+        const env = document.getElementById('envSelector').value;
+        if (!env) return;
+
+        const btn = document.getElementById('btnFetchApis');
+        const loader = document.getElementById('fetchLoader');
+        const label = document.getElementById('fetchLabel');
+
+        btn.disabled = true;
+        loader.classList.remove('hidden');
+        label.classList.add('hidden');
+
+        setTimeout(() => {
+            document.getElementById('apiSection').classList.remove('disabled-state');
+            const selector = document.getElementById('apiSelector');
+            selector.disabled = false;
+            document.getElementById('btnInspect').disabled = false;
+
+            selector.innerHTML = `
+                <option value="1">GET /api/v1/auth/status</option>
+                <option value="2">POST /api/v1/data/sync</option>
+                <option value="3">GET /api/v1/logs/stream</option>
+            `;
+
+            btn.disabled = false;
+            loader.classList.add('hidden');
+            label.classList.remove('hidden');
+        }, 1200);
+    }
+
+    function inspectApi() {
+        document.getElementById('resultsSection').classList.remove('disabled-state');
+
+        const mockReq = {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Request-ID": "RQ-99" },
+            body: { action: "sync", target: "cloud_node_01", recursive: true }
+        };
+        const mockRes = {
+            status: "success",
+            code: 200,
+            payload: {
+                items_processed: 142,
+                errors: [],
+                node_health: "nominal",
+                storage_used: "42.1GB"
+            }
+        };
+
+        document.getElementById('responseString').innerText = "SESSION_" + Math.random().toString(36).substring(2, 15).toUpperCase();
+        document.getElementById('jsonLeft').innerText = JSON.stringify(mockReq, null, 4);
+        document.getElementById('jsonRight').innerText = JSON.stringify(mockRes, null, 4);
+    }
+
+</script>
+</body>
+</html>

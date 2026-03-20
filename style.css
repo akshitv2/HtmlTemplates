@@ -1,0 +1,41 @@
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap');
+
+/* Dynamic Glass Effect Component */
+.glass {
+    background-color: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(226, 232, 240, 1);
+}
+
+/* Dark mode version of glass */
+.dark .glass {
+    background-color: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Animation utilities for the response container */
+.animate-in {
+    animation: fadeInSlide 0.5s ease-out forwards;
+}
+
+@keyframes fadeInSlide {
+    from {
+        opacity: 0;
+        transform: translateY(1rem);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+/* Base Body Styles */
+body {
+    font-family: 'Inter', sans-serif;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+code, pre {
+    font-family: 'Fira Code', monospace;
+}

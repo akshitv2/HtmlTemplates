@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Log Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap');
+
+        .glass {
+            @apply bg-white/90 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10;
+        }
+
+        /* HIGH VISIBILITY SCROLLBAR */
+        #viewport::-webkit-scrollbar {
+            width: 14px; /* Wider for easier grabbing */
+        }
+        #viewport::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05); /* Subtle track */
+            @apply dark:bg-slate-900/50;
+        }
+        #viewport::-webkit-scrollbar-thumb {
+            /* High contrast thumb */
+            background-color: #94a3b8; /* Slate-400 */
+            border: 3px solid transparent;
+            border-radius: 9px;
+            background-clip: content-box;
+        }
+        #viewport::-webkit-scrollbar-thumb:hover {
+            background-color: #3b82f6; /* Bright Blue on hover */
+        }
+
+        /* Ensure the viewport is actually scrollable */
+        #viewport {
+            scrollbar-gutter: stable; /* Prevents layout shift when scrollbar appears */
+        }
+
+        .line-item { height: 28px; }
+        .timestamp-pill { @apply shadow-2xl border-blue-500/50 bg-white dark:bg-slate-800; }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col transition-colors duration-300 bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden">
+
+<div class="fixed top-4 right-6 z-50">
+    <button id="themeToggle" class="p-3 rounded-full glass hover:scale-110 transition-transform active:scale-95 shadow-lg">
+        <i id="themeIcon" data-lucide="moon" class="w-5 h-5 text-slate-600 dark:text-yellow-400"></i>
+    </button>
+</div>
+
+<header class="w-full p-4 z-20">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4">
+        <div class="flex-shrink-0">
+            <h1 class="text-xl font-bold tracking-tight text-blue-600 dark:text-blue-400">LogAnalyzer<span class="text-slate-400 font-light text-sm ml-2">v2.1</span></h1>
+        </div>
+
+        <div class="glass p-2 rounded-xl flex-grow flex flex-col md:flex-row gap-2 w-full">
+            <div class="relative flex-grow">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                <input
+                        type="text" id="filterInput"
+                        placeholder="Search logs (e.g. ERROR, 192.168.1.1)..."
+                        class="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm dark:text-white"
+                >
+            </div>
+
+            <label class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold py-2 px-6 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-md">
+                <i data-lucide="file-up" class="w-4 h-4"></i>
+                Upload Log
+                <input type="file" id="fileInput" class="hidden" accept=".txt,.log">
+            </label>
+        </div>
+
+        <div id="status" class="text-xs font-mono text-slate-500 bg-white/50 dark:bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
+            Standby
+        </div>
+    </div>
+</header>
+
+<main class="flex-grow px-4 pb-4 overflow-hidden flex flex-col relative">
+    <div class="glass rounded-2xl flex-grow flex flex-col overflow-hidden shadow-2xl relative">
+
+        <div class="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+            <div class="flex items-center gap-4 text-sm font-medium text-slate-600 dark:text-slate-400">
+                <span class="flex items-center gap-2"><i data-lucide="terminal" class="w-4 h-4 text-blue-500"></i> Live Buffer</span>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="window.location.reload()" class="text-xs flex items-center gap-2 text-slate-500 hover:text-red-500 transition-colors">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Clear Session
+                </button>
+            </div>
+        </div>
+
+        <div id="scrollIndicator" class="absolute right-12 top-10 opacity-0 transition-opacity duration-300 pointer-events-none z-30">
+            <div style="background-color: rgba(255,255,255,10)" class="glass timestamp-pill px-4 py-2 rounded-full text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center gap-2 border-2">
+                <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+                <span id="indicatorText">--:--:--</span>
+            </div>
+        </div>
+
+        <div id="viewport" class="relative flex-grow overflow-y-auto font-mono text-sm">
+            <div id="phantom-scroller" class="absolute top-0 left-0 w-px pointer-events-none"></div>
+            <div id="content-container" class="absolute top-0 left-0 w-full will-change-transform">
+                <div id="emptyState" class="p-20 text-center text-slate-400">
+                    <i data-lucide="database" class="w-16 h-16 mx-auto mb-4 opacity-10"></i>
+                    <p class="text-lg font-light">No data in buffer</p>
+                    <p class="text-sm opacity-60">Upload a text file to begin high-speed analysis</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    // Initialize Icons
+    lucide.createIcons();
+
+    const viewport = document.getElementById('viewport');
+    const phantom = document.getElementById('phantom-scroller');
+    const container = document.getElementById('content-container');
+    const fileInput = document.getElementById('fileInput');
+    const filterInput = document.getElementById('filterInput');
+    const status = document.getElementById('status');
+    const indicator = document.getElementById('scrollIndicator');
+    const indicatorText = document.getElementById('indicatorText');
+    const emptyState = document.getElementById('emptyState');
+
+    const LINE_HEIGHT = 28;
+    const BUFFER = 20;
+
+    let allLines = [];
+    let visibleLines = [];
+    let scrollTimeout;
+
+    // --- File Handling ---
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        status.textContent = "Parsing File...";
+
+        reader.onload = (event) => {
+            allLines = event.target.result.split(/\r?\n/);
+            if (emptyState) emptyState.remove();
+            applyFilter();
+        };
+        reader.readAsText(file);
+    });
+
+    // --- Filtering ---
+    filterInput.addEventListener('input', applyFilter);
+
+    function applyFilter() {
+        const term = filterInput.value.toLowerCase();
+        visibleLines = term ? allLines.filter(l => l.toLowerCase().includes(term)) : allLines;
+
+        status.textContent = `${visibleLines.length.toLocaleString()} rows`;
+        phantom.style.height = `${visibleLines.length * LINE_HEIGHT}px`;
+        viewport.scrollTop = 0;
+        render();
+    }
+
+    // --- Rendering Logic ---
+    function render() {
+        if (!visibleLines.length) return;
+
+        const scrollTop = viewport.scrollTop;
+        const viewportHeight = viewport.offsetHeight;
+
+        const startIndex = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - BUFFER);
+        const endIndex = Math.min(visibleLines.length, Math.ceil((scrollTop + viewportHeight) / LINE_HEIGHT) + BUFFER);
+
+        // Update Timestamp Indicator
+        const topVisibleIndex = Math.floor(scrollTop / LINE_HEIGHT);
+        const topLine = visibleLines[topVisibleIndex];
+        if (topLine) {
+            // Regex to find things like 2024-01-01 or 12:30:45
+            const tsMatch = topLine.match(/(\d{2,4}[-/]\d{2}[-/]\d{2,4})|(\d{2}:\d{2}:\d{2})/);
+            if (tsMatch) {
+                indicatorText.textContent = tsMatch[0];
+                indicator.classList.remove('opacity-0');
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => indicator.classList.add('opacity-0'), 1000);
+            }
+        }
+
+        container.style.transform = `translateY(${startIndex * LINE_HEIGHT}px)`;
+
+        let html = '';
+        const term = filterInput.value;
+
+        for (let i = startIndex; i < endIndex; i++) {
+            let text = escapeHTML(visibleLines[i]);
+            if (term) {
+                const regex = new RegExp(`(${term})`, 'gi');
+                text = text.replace(regex, `<span class="bg-yellow-200 dark:bg-yellow-500/40 text-yellow-900 dark:text-yellow-100 px-0.5 rounded shadow-sm">$1</span>`);
+            }
+
+            html += `
+                <div class="line-item flex items-center px-6 border-b border-slate-100 dark:border-white/5 hover:bg-blue-500/5 transition-colors">
+                    <span class="w-16 flex-shrink-0 text-[10px] text-slate-400 dark:text-slate-500 font-sans border-r border-slate-100 dark:border-slate-800 mr-4 tracking-tighter">${i + 1}</span>
+                    <span class="truncate text-slate-800 dark:text-slate-300 font-medium dark:font-normal">${text}</span>
+                </div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function escapeHTML(str) {
+        return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
+    }
+
+    // --- Performance Optimization ---
+    let ticking = false;
+    viewport.addEventListener('scroll', () => {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                render();
+                ticking = false;
+            });
+            ticking = true;
+        }
+    });
+
+    window.addEventListener('resize', render);
+
+    // --- Theme Toggle ---
+    const html = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+
+    const updateIcon = (isDark) => {
+        themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+        lucide.createIcons();
+    };
+
+    themeToggle.addEventListener('click', () => {
+        const isDark = html.classList.toggle('dark');
+        localStorage.theme = isDark ? 'dark' : 'light';
+        updateIcon(isDark);
+    });
+
+    // Initialize theme
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        html.classList.add('dark');
+        updateIcon(true);
+    } else {
+        html.classList.remove('dark');
+        updateIcon(false);
+    }
+</script>
+</body>
+</html>

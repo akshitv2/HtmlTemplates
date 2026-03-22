@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JSON to Nested Table</title>
+    <style>
+        table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        th { background-color: #f4f4f4; font-weight: bold; }
+        tr:hover { background-color: #f9f9f9; }
+        .link-item { display: block; margin-bottom: 4px; color: #0066cc; text-decoration: none; }
+    </style>
+</head>
+<body>
+
+<h2>Environment Instance Report</h2>
+<div id="table-container"></div>
+
+<script>
+    const data = {
+        "envs": [
+            {
+                "name": "env1",
+                "instances": [
+                    { "name": "abc", "creation_date": "2026-03-22", "links": ["log1.html", "log2.html"] },
+                    { "name": "abc2", "creation_date": "2026-03-22", "links": ["log1.html", "log2.html"] }
+                ]
+            },
+            {
+                "name": "env2",
+                "instances": [
+                    { "name": "def", "creation_date": "2026-03-22", "links": ["log1.html", "log2.html"] },
+                    { "name": "def2", "creation_date": "2026-03-22", "links": ["log1.html", "log2.html"] }
+                ]
+            }
+        ]
+    };
+
+    function renderTable(data) {
+        const container = document.getElementById('table-container');
+        let html = `<table>
+        <thead>
+            <tr>
+                <th>Env Name</th>
+                <th>Instance Name</th>
+                <th>Creation Date</th>
+                <th>Logs</th>
+            </tr>
+        </thead>
+        <tbody>`;
+
+        data.envs.forEach(env => {
+            // Total rows for this Env = sum of links in all its instances
+            const envRowSpan = env.instances.reduce((sum, inst) => sum + inst.links.length, 0);
+
+            env.instances.forEach((inst, instIdx) => {
+                const instRowSpan = inst.links.length;
+
+                inst.links.forEach((link, linkIdx) => {
+                    html += `<tr>`;
+
+                    // Only add Env cell on the first link of the first instance
+                    if (instIdx === 0 && linkIdx === 0) {
+                        html += `<td rowspan="${envRowSpan}"><strong>${env.name}</strong></td>`;
+                    }
+
+                    // Only add Instance cells on the first link of that instance
+                    if (linkIdx === 0) {
+                        html += `<td rowspan="${instRowSpan}">${inst.name}</td>`;
+                        html += `<td rowspan="${instRowSpan}">${inst.creation_date}</td>`;
+                    }
+
+                    // Add the link cell
+                    html += `<td><a class="link-item" href="${link}">${link}</a></td>`;
+                    html += `</tr>`;
+                });
+            });
+        });
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+    }
+
+    renderTable(data);
+</script>
+
+</body>
+</html>

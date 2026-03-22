@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Log Analyzer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Fira Code', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Fira+Code:wght@400;500&display=swap');
+        .glass { @apply bg-white/70 dark:bg-slate-900/50 backdrop-blur-xl border border-slate-200 dark:border-white/10; }
+
+        /* Hide scrollbar for cleaner look but keep functionality */
+        #viewport::-webkit-scrollbar { width: 8px; }
+        #viewport::-webkit-scrollbar-track { background: transparent; }
+        #viewport::-webkit-scrollbar-thumb { @apply bg-slate-300 dark:bg-slate-700 rounded-full; }
+
+        .line-item { height: 28px; } /* Strictly fixed for math */
+    </style>
+</head>
+
+<body class="h-screen flex flex-col transition-colors duration-300 bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden">
+
+<div class="fixed top-4 right-6 z-50">
+    <button id="themeToggle" class="p-3 rounded-full glass hover:scale-110 transition-transform active:scale-95 shadow-lg">
+        <i id="themeIcon" data-lucide="moon" class="w-5 h-5 text-slate-600 dark:text-yellow-400"></i>
+    </button>
+</div>
+
+<header class="w-full p-4 space-y-4 z-20 shadow-sm">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center gap-4">
+        <div class="flex-shrink-0">
+            <h1 class="text-xl font-bold tracking-tight text-blue-600 dark:text-blue-400">LogAnalyzer<span class="text-slate-400 font-light text-sm ml-2">v2.0</span></h1>
+        </div>
+
+        <div class="glass p-2 rounded-xl flex-grow flex flex-col md:flex-row gap-2 w-full">
+            <div class="relative flex-grow">
+                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
+                <input
+                        type="text" id="filterInput"
+                        placeholder="Filter logs (e.g. '404' or 'Crit')..."
+                        class="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                >
+            </div>
+
+            <label class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold py-2 px-6 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95">
+                <i data-lucide="file-up" class="w-4 h-4"></i>
+                Open File
+                <input type="file" id="fileInput" class="hidden" accept=".txt,.log">
+            </label>
+        </div>
+
+        <div id="status" class="text-xs font-mono text-slate-500 whitespace-nowrap bg-slate-200/50 dark:bg-slate-800/50 px-3 py-2 rounded-lg">
+            No file loaded
+        </div>
+    </div>
+</header>
+
+<main class="flex-grow px-4 pb-4 overflow-hidden flex flex-col">
+    <div class="glass rounded-2xl flex-grow flex flex-col overflow-hidden shadow-2xl">
+        <div class="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-100/30 dark:bg-slate-800/30">
+            <div class="flex items-center gap-4 text-sm font-medium text-slate-600 dark:text-slate-400">
+                <span class="flex items-center gap-2"><i data-lucide="terminal" class="w-4 h-4 text-blue-500"></i> Console Output</span>
+            </div>
+            <button onclick="window.location.reload()" class="text-xs flex items-center gap-2 text-slate-500 hover:text-blue-500 transition-colors">
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i> Clear
+            </button>
+        </div>
+
+        <div id="viewport" class="relative flex-grow overflow-y-auto font-mono text-sm">
+            <div id="phantom-scroller" class="absolute top-0 left-0 w-px pointer-events-none"></div>
+            <div id="content-container" class="absolute top-0 left-0 w-full will-change-transform">
+                <div class="p-20 text-center text-slate-500">
+                    <i data-lucide="upload-cloud" class="w-12 h-12 mx-auto mb-4 opacity-20"></i>
+                    <p>Drag and drop a massive text file here to begin</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    // Lucide Icon Initialization
+    lucide.createIcons();
+
+    const viewport = document.getElementById('viewport');
+    const phantom = document.getElementById('phantom-scroller');
+    const container = document.getElementById('content-container');
+    const fileInput = document.getElementById('fileInput');
+    const filterInput = document.getElementById('filterInput');
+    const status = document.getElementById('status');
+
+    const LINE_HEIGHT = 28;
+    const BUFFER = 15;
+
+    let allLines = [];
+    let visibleLines = [];
+
+    // File Loading
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        status.textContent = "Processing...";
+
+        reader.onload = (event) => {
+            allLines = event.target.result.split(/\r?\n/);
+            applyFilter();
+        };
+        reader.readAsText(file);
+    });
+
+    // Filtering
+    filterInput.addEventListener('input', applyFilter);
+
+    function applyFilter() {
+        const term = filterInput.value.toLowerCase();
+        visibleLines = term ? allLines.filter(l => l.toLowerCase().includes(term)) : allLines;
+
+        status.textContent = `${visibleLines.length.toLocaleString()} lines`;
+        phantom.style.height = `${visibleLines.length * LINE_HEIGHT}px`;
+        viewport.scrollTop = 0;
+        render();
+    }
+
+    // Rendering
+    function render() {
+        if (!visibleLines.length) return;
+
+        const scrollTop = viewport.scrollTop;
+        const viewportHeight = viewport.offsetHeight;
+
+        const startIndex = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - BUFFER);
+        const endIndex = Math.min(visibleLines.length, Math.ceil((scrollTop + viewportHeight) / LINE_HEIGHT) + BUFFER);
+
+        container.style.transform = `translateY(${startIndex * LINE_HEIGHT}px)`;
+
+        let html = '';
+        const term = filterInput.value;
+
+        for (let i = startIndex; i < endIndex; i++) {
+            let text = escapeHTML(visibleLines[i]);
+            if (term) {
+                const regex = new RegExp(`(${term})`, 'gi');
+                // High contrast highlight for both modes
+                text = text.replace(regex, `<span class="bg-yellow-200 dark:bg-yellow-500/30 text-yellow-900 dark:text-yellow-200 px-0.5 rounded">$1</span>`);
+            }
+
+            html += `
+                <div class="line-item flex items-center px-6 border-b border-slate-200 dark:border-white/5 hover:bg-blue-500/5 transition-colors">
+                    <span class="w-12 flex-shrink-0 text-[10px] text-slate-400 dark:text-slate-500 font-sans border-right border-slate-100 dark:border-slate-800 mr-2">${i + 1}</span>
+                    <span class="truncate text-slate-800 dark:text-slate-300 font-medium dark:font-normal">${text}</span>
+                </div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function escapeHTML(str) {
+        return str.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
+    }
+
+    // Performance Optimized Scroll
+    let ticking = false;
+    viewport.addEventListener('scroll', () => {
+        if (!ticking) {
+            window.requestAnimationFrame(() => {
+                render();
+                ticking = false;
+            });
+            ticking = true;
+        }
+    });
+
+    window.addEventListener('resize', render);
+
+    // Theme Toggle Logic
+    const html = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+
+    const updateIcon = (isDark) => {
+        themeIcon.setAttribute('data-lucide', isDark ? 'sun' : 'moon');
+        lucide.createIcons();
+    };
+
+    themeToggle.addEventListener('click', () => {
+        const isDark = html.classList.toggle('dark');
+        localStorage.theme = isDark ? 'dark' : 'light';
+        updateIcon(isDark);
+    });
+</script>
+</body>
+</html>

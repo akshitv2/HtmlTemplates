@@ -1,0 +1,46 @@
+{
+  "envs": [
+    {
+      "name": "env1",
+      "instances": [
+        {
+          "name": "abc",
+          "creation_date": "2026-03-22",
+          "links": [
+            "log1.html",
+            "log2.html"
+          ]
+        },
+        {
+          "name": "abc2",
+          "creation_date": "2026-03-22",
+          "links": [
+            "log1.html",
+            "log2.html"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "env2",
+      "instances": [
+        {
+          "name": "def",
+          "creation_date": "2026-03-22",
+          "links": [
+            "log1.html",
+            "log2.html"
+          ]
+        },
+        {
+          "name": "def2",
+          "creation_date": "2026-03-22",
+          "links": [
+            "log1.html",
+            "log2.html"
+          ]
+        }
+      ]
+    }
+  ]
+}

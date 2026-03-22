@@ -26,45 +26,43 @@
             @apply bg-white/90 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200 dark:border-white/10;
         }
 
-        /* RESTORED: HIGH VISIBILITY SCROLLBAR */
-        #viewport::-webkit-scrollbar {
-            width: 14px;
-        }
-
-        #viewport::-webkit-scrollbar-track {
-            background: rgba(0, 0, 0, 0.05);
-            @apply dark:bg-slate-900/50;
-        }
-
+        #viewport::-webkit-scrollbar { width: 14px; }
+        #viewport::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.05); @apply dark:bg-slate-900/50; }
         #viewport::-webkit-scrollbar-thumb {
             background-color: #94a3b8;
             border: 3px solid transparent;
             border-radius: 9px;
             background-clip: content-box;
         }
-
-        #viewport::-webkit-scrollbar-thumb:hover {
-            background-color: #3b82f6;
-        }
-
-        #viewport {
-            scrollbar-gutter: stable;
-        }
+        #viewport::-webkit-scrollbar-thumb:hover { background-color: #3b82f6; }
+        #viewport { scrollbar-gutter: stable; }
 
         .line-item {
-            height: 28px;
             cursor: context-menu;
+            line-height: 1.5rem; /* ~24px */
         }
 
-        .timestamp-pill {
-            @apply shadow-2xl border-blue-500/50 bg-white dark:bg-slate-800;
+        /* Logic for multi-line truncation */
+        .log-text {
+            display: -webkit-box;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         #contextMenu {
             display: none;
             position: fixed;
             z-index: 1000;
-            min-width: 180px;
+            min-width: 200px;
+        }
+
+        .modal-bg {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 2000;
+            backdrop-filter: blur(4px);
         }
 
         .dark .glass {
@@ -85,7 +83,24 @@
 
 <body class="h-screen flex flex-col transition-colors duration-300 bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 overflow-hidden">
 
+<div id="fullLogModal" class="modal-bg flex items-center justify-center p-6" style="display: none;">
+    <div class="glass w-full max-w-4xl max-h-[80vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+        <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+            <h3 class="font-bold text-blue-500">Full Log Message</h3>
+            <button onclick="closeModal()" class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        <div id="modalContent" class="p-6 overflow-y-auto font-mono text-sm whitespace-pre-wrap break-words selection:bg-blue-500/30"></div>
+    </div>
+</div>
+
 <div id="contextMenu" class="glass rounded-lg shadow-2xl p-1 border border-slate-200 dark:border-slate-700">
+    <button onclick="showFullLogFromContext()"
+            class="w-full text-left px-4 py-2 text-xs hover:bg-blue-600 hover:text-white rounded flex items-center gap-2 transition-colors font-semibold">
+        <i data-lucide="maximize-2" class="w-3.5 h-3.5"></i> View Full Message
+    </button>
+    <div class="h-px bg-slate-200 dark:bg-slate-800 my-1"></div>
     <button onclick="setRangeFromContext('start')"
             class="w-full text-left px-4 py-2 text-xs hover:bg-blue-500 hover:text-white rounded flex items-center gap-2 transition-colors">
         <i data-lucide="log-in" class="w-3.5 h-3.5"></i> Set as Start Time
@@ -98,45 +113,40 @@
     <div id="contextTsDisplay" class="px-4 py-1.5 text-[10px] text-slate-400 font-mono italic">No TS found</div>
 </div>
 
-<div class="fixed top-4 right-6 z-50">
-    <button id="themeToggle"
-            class="p-3 rounded-full glass hover:scale-110 transition-transform active:scale-95 shadow-lg">
-        <i id="themeIcon" data-lucide="moon" class="w-5 h-5 text-slate-600 dark:text-yellow-400"></i>
-    </button>
-</div>
-
 <header class="w-full p-4 z-20">
     <div class="max-w-7xl mx-auto flex flex-col gap-4">
         <div class="flex items-center justify-between">
-            <h1 class="text-xl font-bold tracking-tight text-blue-600 dark:text-blue-400">LogAnalyzer<span
-                    class="text-slate-400 font-light text-sm ml-2">v2.4</span></h1>
-            <div id="status"
-                 class="text-xs font-mono text-slate-500 bg-white/50 dark:bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">
-                Standby
-            </div>
+            <h1 class="text-xl font-bold tracking-tight text-blue-600 dark:text-blue-400">LogAnalyzer<span class="text-slate-400 font-light text-sm ml-2">v2.5</span></h1>
+            <div id="status" class="text-xs font-mono text-slate-500 bg-white/50 dark:bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700">Standby</div>
         </div>
 
-        <div class="glass p-2 rounded-xl flex flex-col lg:flex-row gap-3 w-full items-center">
-            <div class="relative flex-grow w-full">
+        <div class="glass p-2 rounded-xl flex flex-wrap lg:flex-nowrap gap-3 w-full items-center">
+            <div class="relative flex-grow min-w-[200px]">
                 <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"></i>
-                <input type="text" id="filterInput" placeholder="Search..."
-                       class="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                <input type="text" id="filterInput" placeholder="Search logs..." class="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg py-2 pl-10 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
             </div>
 
-            <div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg border border-slate-200 dark:border-slate-700 w-full lg:w-auto">
+            <div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 p-1 px-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                <span class="text-[10px] uppercase font-bold text-slate-400">Lines</span>
+                <select id="lineDisplayLimit" class="bg-transparent text-xs font-bold focus:outline-none cursor-pointer text-blue-500">
+                    <option value="1">1 Line</option>
+                    <option value="2">2 Lines</option>
+                    <option value="3">3 Lines</option>
+                    <option value="5">5 Lines</option>
+                    <option value="10">10 Lines</option>
+                </select>
+            </div>
+
+            <div class="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg border border-slate-200 dark:border-slate-700">
                 <div class="px-2 text-[10px] uppercase font-bold text-slate-400">Range</div>
-                <input type="datetime-local" id="startTime"
-                       class="bg-transparent text-xs focus:outline-none dark:text-slate-200">
+                <input type="datetime-local" id="startTime" class="bg-transparent text-xs focus:outline-none dark:text-slate-200">
                 <span class="text-slate-400 text-xs">-</span>
-                <input type="datetime-local" id="endTime"
-                       class="bg-transparent text-xs focus:outline-none dark:text-slate-200">
-                <button id="clearTime" class="p-1 hover:text-red-500 transition-colors"><i data-lucide="x-circle"
-                                                                                           class="w-4 h-4"></i></button>
+                <input type="datetime-local" id="endTime" class="bg-transparent text-xs focus:outline-none dark:text-slate-200">
+                <button id="clearTime" class="p-1 hover:text-red-500 transition-colors"><i data-lucide="x-circle" class="w-4 h-4"></i></button>
             </div>
 
-            <label class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold py-2 px-6 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-md shrink-0 w-full lg:w-auto">
-                <i data-lucide="file-up" class="w-4 h-4"></i> Upload <input type="file" id="fileInput" class="hidden"
-                                                                            accept=".txt,.log">
+            <label class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold py-2 px-6 rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-md shrink-0">
+                <i data-lucide="file-up" class="w-4 h-4"></i> Upload <input type="file" id="fileInput" class="hidden" accept=".txt,.log">
             </label>
         </div>
     </div>
@@ -144,9 +154,7 @@
 
 <main class="flex-grow px-4 pb-4 overflow-hidden flex flex-col relative">
     <div class="glass rounded-2xl flex-grow flex flex-col overflow-hidden shadow-2xl relative">
-
-        <div id="scrollIndicator"
-             class="absolute right-12 top-6 opacity-0 transition-opacity duration-300 pointer-events-none z-30">
+        <div id="scrollIndicator" class="absolute right-12 top-6 opacity-0 transition-opacity duration-300 pointer-events-none z-30">
             <div class="glass timestamp-pill px-4 py-2 rounded-full text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center gap-2 border-2">
                 <i data-lucide="clock" class="w-3.5 h-3.5"></i>
                 <span id="indicatorText">--:--:--</span>
@@ -173,6 +181,7 @@
     const container = document.getElementById('content-container');
     const fileInput = document.getElementById('fileInput');
     const filterInput = document.getElementById('filterInput');
+    const lineDisplayLimit = document.getElementById('lineDisplayLimit');
     const startTimeInput = document.getElementById('startTime');
     const endTimeInput = document.getElementById('endTime');
     const indicator = document.getElementById('scrollIndicator');
@@ -180,26 +189,61 @@
     const contextMenu = document.getElementById('contextMenu');
     const contextTsDisplay = document.getElementById('contextTsDisplay');
     const status = document.getElementById('status');
+    const modal = document.getElementById('fullLogModal');
+    const modalContent = document.getElementById('modalContent');
 
-    const LINE_HEIGHT = 28;
+    // CONFIGURATION
+    const BASE_LINE_HEIGHT = 24; // Height of one line of text
+    const VERTICAL_PADDING = 8;  // Padding top + bottom of row
+    let currentLineLimit = 1;
+    let calculatedRowHeight = BASE_LINE_HEIGHT + VERTICAL_PADDING;
+
     const BUFFER = 20;
     const TS_REGEX = /(\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2})|(\d{2}:\d{2}:\d{2})/;
 
     let allLines = [];
     let visibleLines = [];
+    let contextActiveIndex = null;
     let contextActiveTs = null;
     let scrollTimeout;
+
+    // --- Row Height Management ---
+    function updateRowHeight() {
+        currentLineLimit = parseInt(lineDisplayLimit.value);
+        // Calculate: (line-height * number of lines) + padding
+        calculatedRowHeight = (24 * currentLineLimit) + 12;
+        applyFilter(); // Refresh list with new height math
+    }
+
+    lineDisplayLimit.addEventListener('change', updateRowHeight);
+
+    // --- Modal Logic ---
+    function showFullLogFromContext() {
+        if (contextActiveIndex === null) return;
+        modalContent.textContent = visibleLines[contextActiveIndex];
+        modal.style.display = 'flex';
+        contextMenu.style.display = 'none';
+    }
+
+    function closeModal() {
+        modal.style.display = 'none';
+    }
+
+    modal.addEventListener('click', (e) => {
+        if(e.target === modal) closeModal();
+    });
 
     // --- Context Menu ---
     window.addEventListener('contextmenu', (e) => {
         const lineItem = e.target.closest('.line-item');
         if (lineItem) {
             e.preventDefault();
-            const index = parseInt(lineItem.dataset.index);
-            const lineText = visibleLines[index];
+            contextActiveIndex = parseInt(lineItem.dataset.index);
+            const lineText = visibleLines[contextActiveIndex];
             const match = lineText.match(TS_REGEX);
             contextActiveTs = match ? match[0] : null;
             contextTsDisplay.textContent = contextActiveTs ? `TS: ${contextActiveTs}` : "No Timestamp Found";
+
             contextMenu.style.display = 'block';
             contextMenu.style.left = `${e.pageX}px`;
             contextMenu.style.top = `${e.pageY}px`;
@@ -259,7 +303,7 @@
         });
 
         status.textContent = `${visibleLines.length.toLocaleString()} rows`;
-        phantom.style.height = `${visibleLines.length * LINE_HEIGHT}px`;
+        phantom.style.height = `${visibleLines.length * calculatedRowHeight}px`;
         viewport.scrollTop = 0;
         render();
     }
@@ -267,11 +311,10 @@
     function render() {
         if (!visibleLines.length) return;
         const scrollTop = viewport.scrollTop;
-        const startIndex = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - BUFFER);
-        const endIndex = Math.min(visibleLines.length, Math.ceil((scrollTop + viewport.offsetHeight) / LINE_HEIGHT) + BUFFER);
+        const startIndex = Math.max(0, Math.floor(scrollTop / calculatedRowHeight) - BUFFER);
+        const endIndex = Math.min(visibleLines.length, Math.ceil((scrollTop + viewport.offsetHeight) / calculatedRowHeight) + BUFFER);
 
-        // RESTORED: Update Indicator logic
-        const topVisibleIndex = Math.floor(scrollTop / LINE_HEIGHT);
+        const topVisibleIndex = Math.floor(scrollTop / calculatedRowHeight);
         const topLine = visibleLines[topVisibleIndex];
         if (topLine) {
             const tsMatch = topLine.match(TS_REGEX);
@@ -283,37 +326,29 @@
             }
         }
 
-        container.style.transform = `translateY(${startIndex * LINE_HEIGHT}px)`;
+        container.style.transform = `translateY(${startIndex * calculatedRowHeight}px)`;
         let html = '';
         const term = filterInput.value;
 
         for (let i = startIndex; i < endIndex; i++) {
             let text = visibleLines[i].replace(/[&<>"']/g, m => ({
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#39;'
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             })[m]);
             if (term) text = text.replace(new RegExp(`(${term})`, 'gi'), `<span class="bg-yellow-500/30 px-0.5 rounded">$1</span>`);
+
             html += `
-                <div class="line-item flex items-center px-6 border-b border-slate-100 dark:border-white/5 hover:bg-blue-500/5 transition-colors" data-index="${i}">
-                    <span class="w-16 flex-shrink-0 text-[10px] text-slate-500 font-sans border-r border-slate-800 mr-4">${i + 1}</span>
-                    <span class="truncate text-slate-800 dark:text-slate-300">${text}</span>
+                <div class="line-item flex items-start px-6 border-b border-slate-100 dark:border-white/5 hover:bg-blue-500/5 transition-colors py-[6px]"
+                     style="height: ${calculatedRowHeight}px;"
+                     data-index="${i}">
+                    <span class="w-12 flex-shrink-0 text-[10px] text-slate-500 font-sans border-r border-slate-200 dark:border-slate-800 mr-4 h-full pt-1">${i + 1}</span>
+                    <span class="log-text text-slate-800 dark:text-slate-300 w-full" style="-webkit-line-clamp: ${currentLineLimit};">
+                        ${text}
+                    </span>
                 </div>`;
         }
         container.innerHTML = html;
     }
 
-    [startTimeInput, endTimeInput].forEach(el => el.addEventListener('input', applyFilter));
-    document.getElementById('clearTime').onclick = () => {
-        startTimeInput.value = "";
-        endTimeInput.value = "";
-        applyFilter();
-    };
-
-    // --- Debounce Helper ---
-    // This prevents the filter from running until the user stops typing for 300ms
     function debounce(func, delay) {
         let timeout;
         return function(...args) {
@@ -322,17 +357,9 @@
         };
     }
 
-    // --- Updated Event Listeners ---
-
-    // Apply the debounce specifically to the text search input
-    const debouncedFilter = debounce(applyFilter, 300);
-
-    filterInput.addEventListener('input', debouncedFilter);
-
-    // Keep time inputs immediate, as they are usually picked from a UI, not typed rapidly
+    filterInput.addEventListener('input', debounce(applyFilter, 300));
     startTimeInput.addEventListener('input', applyFilter);
     endTimeInput.addEventListener('input', applyFilter);
-
     document.getElementById('clearTime').onclick = () => {
         startTimeInput.value = "";
         endTimeInput.value = "";
@@ -341,7 +368,6 @@
 
     viewport.addEventListener('scroll', () => window.requestAnimationFrame(render));
 
-    // Theme Toggle
     document.getElementById('themeToggle').addEventListener('click', () => {
         const isDark = document.documentElement.classList.toggle('dark');
         document.getElementById('themeIcon').setAttribute('data-lucide', isDark ? 'sun' : 'moon');

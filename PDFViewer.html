@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Page Logger</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <style>
+        body { background-color: #525659; margin: 0; font-family: sans-serif; }
+        #pdf-container { display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        canvas { box-shadow: 0 0 10px rgba(0,0,0,0.5); margin-bottom: 20px; background-color: white; }
+        #status-bar { position: fixed; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); color: white; padding: 5px 15px; border-radius: 20px; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+<div id="status-bar">Check Console (F12) to see logs</div>
+<div id="pdf-container"></div>
+
+<script>
+    // Set worker path (required by PDF.js)
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // URL of the PDF (Using a sample PDF)
+    const url = 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf';
+
+    const container = document.getElementById('pdf-container');
+
+    // Initialize Intersection Observer
+    const observerOptions = {
+        root: null, // use viewport
+        threshold: 0.6 // Trigger when 60% of the page is visible
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const pageNum = entry.target.getAttribute('data-page-num');
+                console.log(`%c Viewing Page: ${pageNum} `, 'background: #222; color: #bada55; font-weight: bold;');
+            }
+        });
+    }, observerOptions);
+
+    // Load and Render PDF
+    pdfjsLib.getDocument(url).promise.then(pdf => {
+        console.log(`PDF Loaded: ${pdf.numPages} pages found.`);
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+            // Create a container/canvas for each page
+            pdf.getPage(i).then(page => {
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                canvas.setAttribute('data-page-num', i); // Label for the observer
+
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+
+                page.render(renderContext).promise.then(() => {
+                    container.appendChild(canvas);
+                    observer.observe(canvas); // Start watching this page
+                });
+            });
+        }
+    }).catch(err => {
+        console.error('Error loading PDF: ', err);
+        container.innerHTML = "Error loading PDF. Check CORS or URL.";
+    });
+</script>
+</body>
+</html>

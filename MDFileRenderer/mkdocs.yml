@@ -1,0 +1,7 @@
+site_name: Project Concept Papers
+nav:
+  - Introduction: index.md
+  - Architecture:
+      - Overview: overview.md
+      - Database Schema: docs/architecture/schema.md
+  - External Resources: custom_dashboard.html
